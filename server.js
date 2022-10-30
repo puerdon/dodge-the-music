@@ -1,8 +1,9 @@
 const express = require('express');
-const app = express();
 const http = require('http');
-const server = http.createServer(app);
 const { Server } = require("socket.io");
+
+const app = express();
+const server = http.createServer(app);
 const io = new Server(server);
 
 app.get('/', (req, res) => {
@@ -22,12 +23,10 @@ io.on('connection', (socket) => {
   socket.on('player_move', (action) => {
     socket.broadcast.emit('player_move', action);
   });
-
-
 });
-
-
 
 server.listen(3000, () => {
   console.log('listening on *:3000');
 });
+
+
