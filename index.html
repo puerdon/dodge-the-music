@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>WebMidi.js Quick Start</title>
+    <script src="https://cdn.jsdelivr.net/npm/webmidi@latest/dist/iife/webmidi.iife.js"></script>
+    <!-- <script src="https://cdn.socket.io/4.5.3/socket.io.min.js" integrity="sha384-WPFUvHkB1aHA5TDSZi6xtDgkF0wXJcIIxXhC6h8OT8EH3fC5PWro5pWJ1THjcfEi" crossorigin="anonymous"></script> -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/p5@1.5.0/lib/p5.js"></script> -->
+    <style>
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+    }
+
+    #canvas {
+    	position: absolute;
+    	transform: translate(-50%, -50%);
+    	left: 50%;
+    	top: 50%;
+    	width: 1200px;
+    	height: 600px;
+    }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas" style="border:1px solid black"></canvas>
+    <!-- <h1>WebMidi.js Quick Start</h1> -->
+    <script>
+    var socket = io();
+    //     	io.on('connection', (socket) => {
+    //   console.log('a user connected');
+    //   socket.on('disconnect', () => {
+    //     console.log('user disconnected');
+    //   });
+    // });
+    const URL = window.location.href;
+
+
+    // https://www.inspiredacoustics.com/en/MIDI_note_numbers_and_center_frequencies
+    // 88鍵鋼琴
+    // 最低音A0: 21 (e.note.number)
+    // 最高音C8: 108
+
+    let ctx = null;
+    const HEIGHT = 600;
+    const WIDTH = 1200;
+    const MIDI_LOWEST = 21;
+    const MIDI_HIGHEST = 108;
+    const PLAYER_SPEED = 2.5;
+    let notes = {};
+    // notes 紀錄按下後目前還跑在螢幕上的琴鍵
+    // notes = {
+    // 	24: [ obj, obj ],
+    // 	25: [ obj ]
+    // }
+
+    let keypresses = {
+    	ArrowUp: false,
+    	ArrowDown: false,
+    	ArrowLeft: false,
+    	ArrowRight: false
+    };
+
+
+    // render canvas
+    function draw() {
+        var canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d');
+        ctx.canvas.width = canvas.width = WIDTH;
+        ctx.canvas.height = canvas.height = HEIGHT;
+    }
+    draw();
+
+    // onNoteOn() 和 onNoteOff() 會直接改動 notes 這個 global variable
+    function onNoteOn(num) {
+        var obj = {
+            noteNumber: num,
+            x: 1200,
+            y: 600 - ((num - MIDI_LOWEST) * (600 / (MIDI_HIGHEST - MIDI_LOWEST) )),
+            width: 1,
+            height: 10,
+            noteoff: false,
+        }
+        if (num in notes) {
+            notes[num].push(obj);
+        } else {
+            notes[num] = [obj];
+        }
+    }
+
+    function onNoteOff(num) {
+    	for (let i = 0; i < notes[num].length; i++) {
+    		if (!notes[num][i].noteoff) {
+    			notes[num][i].noteoff = true;
+    			break;
+    		}	
+    	}	
+    }
+
+
+    // 如果query string中包含midicontroller，則作為midi訊號發送者
+    if (URL.includes('midicontroller')) {
+        WebMidi
+            .enable()
+            .then(onEnabled)
+            .catch(err => alert(err));
+
+        function onEnabled() {
+            if (WebMidi.inputs.length < 1) {
+                // document.body.innerHTML+= "No device detected.";
+            } else {
+                WebMidi.inputs.forEach((device, index) => {
+                    // document.body.innerHTML+= `${index}: ${device.name} <br>`;
+                });
+
+                const mySynth = WebMidi.inputs[0];
+
+                mySynth.channels[1].addListener("noteon", e => {
+                    var num = e.note.number;
+                    socket.emit('noteon', num);
+                    onNoteOn(num);
+                })
+
+                mySynth.channels[1].addListener("noteoff", e => {
+                    var num = e.note.number;
+                    socket.emit('noteoff', num);
+                    onNoteOff(num);
+                })
+
+            }
+        }
+    } else {
+        socket.on('noteon', (num) => {
+            onNoteOn(num);
+        })
+
+        socket.on('noteoff', (num) => {
+            onNoteOff(num);
+        })
+    }
+
+
+    socket.on('player_move', (action) => {
+    	switch (action) {
+    		case 'up_left':
+    			x = x - PLAYER_SPEED;
+        		y = y - PLAYER_SPEED;
+        		break;
+        	case 'up_right':
+        		x = x + PLAYER_SPEED;
+        		y = y - PLAYER_SPEED;
+        		break;
+        	case 'down_left':
+    			x = x - PLAYER_SPEED;
+        		y = y + PLAYER_SPEED;
+        		break;
+        	case 'down_right':
+        		x = x + PLAYER_SPEED;
+        		y = y + PLAYER_SPEED;
+        		break;
+        	case 'left':
+    			x = x - PLAYER_SPEED;
+        		break;
+        	case 'right':
+        		x = x + PLAYER_SPEED;
+        		break;
+        	case 'down':
+        		y = y + PLAYER_SPEED;
+        		break;
+        	case 'up':
+        		y = y - PLAYER_SPEED;
+        		break;
+    	}
+    })
+
+    x = 100 //intial horizontal position of drawn rectangle
+    y = 100 //intial vertical position of drawn rectangle
+    player_w = 10, //width of the drawn rectangle
+    player_h = 10; //height of the drawn rectangle
+
+    //Draw Rectangle function		
+    function drawRect(x, y, player_w, player_h) {
+        ctx.fillStyle = '#666'; // Fill color of rectangle drawn
+        ctx.fillRect(x, y, player_w, player_h); //This will draw a rectangle of 20x20
+    }
+
+    function update() {
+        ctx.clearRect(0, 0, 1200, 600);
+
+        // draw player 
+        if (keypresses.ArrowUp && keypresses.ArrowLeft) {
+        	x = x - PLAYER_SPEED;
+        	y = y - PLAYER_SPEED;
+        	socket.emit('player_move', 'up_left');
+        } else if (keypresses.ArrowUp && keypresses.ArrowRight) {
+        	x = x + PLAYER_SPEED;
+        	y = y - PLAYER_SPEED;
+        	socket.emit('player_move', 'up_right');
+        } else if (keypresses.ArrowDown && keypresses.ArrowRight) {
+        	x = x + PLAYER_SPEED;
+        	y = y + PLAYER_SPEED;
+        	socket.emit('player_move', 'down_right');
+        } else if (keypresses.ArrowDown && keypresses.ArrowLeft) {
+        	x = x - PLAYER_SPEED;
+        	y = y + PLAYER_SPEED;
+        	socket.emit('player_move', 'down_left');
+        } else if (keypresses.ArrowUp) {
+        	y = y - PLAYER_SPEED;
+        	socket.emit('player_move', 'up');
+        } else if (keypresses.ArrowDown) {
+        	y = y + PLAYER_SPEED;
+        	socket.emit('player_move', 'down');
+        } else if (keypresses.ArrowLeft) {
+        	x = x - PLAYER_SPEED;
+        	socket.emit('player_move', 'left');
+        } else if (keypresses.ArrowRight) {
+        	x = x + PLAYER_SPEED;
+        	socket.emit('player_move', 'right');
+        }
+        drawRect(x, y, player_w, player_h); //Drawing rectangle on initial load
+
+        // draw midi notes
+        for (var note in notes) {
+            
+            notes[note].forEach(elm => {
+                
+                ctx.fillRect(elm.x, elm.y, elm.width, elm.height);
+                elm.x--;
+                if (!elm.noteoff) {
+                    elm.width++;
+                }
+
+                // 超過邊界就移除
+                if (elm.x + elm.width <= 0) {
+                    notes[note].shift();
+                }
+            })
+        }
+
+        
+
+        requestAnimationFrame(update);
+    }
+    
+    update();
+
+    //move rectangle inside the canvas using arrow keys
+
+    window.onkeydown = function(e) {
+        keypresses[e.key] = true
+    };
+
+    window.onkeyup = function(e) {
+        keypresses[e.key] = false;
+    };
+
+    </script>
+</body>
+
+</html>
