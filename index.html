@@ -13,6 +13,7 @@
     body {
         margin: 0;
         padding: 0;
+        background: #222222;
     }
 
     #canvas {
@@ -23,10 +24,39 @@
     	width: 1200px;
     	height: 600px;
     }
+
+    #midi-select {
+    	display: inline-flex;
+    	position: absolute;
+    	width: 1200px;
+    	left: 50%;
+    	top: 25%;
+    	transform: translate(-50%);
+    }
+
+    #midi-select * {
+    	font-size: 1.5em;
+    }
+
+    #midi-select button {
+    	margin-left: 1em;
+    }
+
+   /* select {
+    	position: absolute;
+
+    	font-size: 2em;
+    	left: 50%;
+    	top: 25%;
+    	transform: translateX(-50%);
+
+
+    }*/
     </style>
 </head>
 
 <body>
+	<div id="midi-select"></div>
     <canvas id="canvas" style="border:1px solid black"></canvas>
     <!-- <h1>WebMidi.js Quick Start</h1> -->
     <script>
@@ -38,6 +68,7 @@
     //   });
     // });
     const URL = window.location.href;
+    const myParent = document.getElementById('midi-select');
 
 
     // https://www.inspiredacoustics.com/en/MIDI_note_numbers_and_center_frequencies
@@ -52,6 +83,7 @@
     const MIDI_HIGHEST = 108;
     const PLAYER_SPEED = 2.5;
     let notes = {};
+    let mySynth = null;
     // notes 紀錄按下後目前還跑在螢幕上的琴鍵
     // notes = {
     // 	24: [ obj, obj ],
@@ -104,20 +136,41 @@
 
     // 如果query string中包含midicontroller，則作為midi訊號發送者
     if (URL.includes('midicontroller')) {
+
         WebMidi
-            .enable()
-            .then(onEnabled)
-            .catch(err => alert(err));
+	    .enable()
+	    .then(onEnabled)
+	    .catch(err => alert(err));
 
         function onEnabled() {
+        	// 選擇midi input的UI:
+        	// select
+	    	var selectList = document.createElement("select");
+			selectList.id = "mySelect";
+			myParent.appendChild(selectList);
+
+			for (var i = 0; i < WebMidi.inputs.length; i++) {
+			    var option = document.createElement("option");
+			    option.value = WebMidi.inputs[i].name;
+			    option.text = WebMidi.inputs[i].name;
+			    selectList.appendChild(option);
+			}
+			// OK button
+	    	var confirmMidiButton = document.createElement("button");
+	    	confirmMidiButton.textContent = 'OK';
+			myParent.appendChild(confirmMidiButton);
+
+
+
             if (WebMidi.inputs.length < 1) {
-                // document.body.innerHTML+= "No device detected.";
+                alert("You don't have any MIDI input yet.")
             } else {
+
                 WebMidi.inputs.forEach((device, index) => {
                     // document.body.innerHTML+= `${index}: ${device.name} <br>`;
                 });
 
-                const mySynth = WebMidi.inputs[3];
+                mySynth = WebMidi.inputs[0];
 
                 mySynth.channels[1].addListener("noteon", e => {
                     var num = e.note.number;
@@ -133,7 +186,7 @@
 
             }
         }
-    } else {
+    } else { // 如果query parameter 中沒有 midicontroller，就要接收來自socket的 noteon noteoff 事件
         socket.on('noteon', (num) => {
             onNoteOn(num);
         })
@@ -227,7 +280,7 @@
         for (var note in notes) {
             
             notes[note].forEach(elm => {
-                
+                ctx.fillStyle = 'white';
                 ctx.fillRect(elm.x, elm.y, elm.width, elm.height);
                 elm.x--;
                 if (!elm.noteoff) {
