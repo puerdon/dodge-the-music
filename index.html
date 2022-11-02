@@ -70,6 +70,37 @@
     const URL = window.location.href;
     const myParent = document.getElementById('midi-select');
 
+    class Emote {
+    	constructor (img_path, x, y, w, h) {
+    		this.image = new Image();
+    		this.image.src = img_path;
+    		this.w = w;
+    		this.h = h;
+    		this.x = x;
+    		this.y = y;
+    		this.upward = true;
+    	}
+
+    	update(){
+    		if (this.upward) {
+    			this.y--;
+    		} else {
+    			this.y++;
+    		}
+    		
+    		if (this.y < this.h) {
+    			this.upward = false;
+    		}
+
+    		if (this.y > HEIGHT) {
+    			this.upward = true;
+    		}
+    		
+
+    	}
+    }
+
+
 
     // https://www.inspiredacoustics.com/en/MIDI_note_numbers_and_center_frequencies
     // 88鍵鋼琴
@@ -84,6 +115,11 @@
     const PLAYER_SPEED = 2.5;
     let notes = {};
     let mySynth = null;
+
+    // const img_emote = new Image();
+    // img_emote.src = './emote.gif';
+    const emote = new Emote('./emote.gif', 600, HEIGHT, 350, 350);
+
     // notes 紀錄按下後目前還跑在螢幕上的琴鍵
     // notes = {
     // 	24: [ obj, obj ],
@@ -104,6 +140,7 @@
         ctx = canvas.getContext('2d');
         ctx.canvas.width = canvas.width = WIDTH;
         ctx.canvas.height = canvas.height = HEIGHT;
+        
     }
     draw();
 
@@ -133,7 +170,7 @@
     	}	
     }
 
-
+    
     // 如果query string中包含midicontroller，則作為midi訊號發送者
     if (URL.includes('midicontroller')) {
 
@@ -241,9 +278,13 @@
         ctx.fillRect(x, y, player_w, player_h); //This will draw a rectangle of 20x20
     }
 
-    function update() {
-        ctx.clearRect(0, 0, 1200, 600);
-
+    function animate() {
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+        
+        ctx.drawImage(emote.image, emote.x, emote.y, emote.w, emote.h);
+        
+        emote.update();
+        
         // draw player 
         if (keypresses.ArrowUp && keypresses.ArrowLeft) {
         	x = x - PLAYER_SPEED;
@@ -296,10 +337,10 @@
 
         
 
-        requestAnimationFrame(update);
+        requestAnimationFrame(animate);
     }
     
-    update();
+    animate();
 
     //move rectangle inside the canvas using arrow keys
 
